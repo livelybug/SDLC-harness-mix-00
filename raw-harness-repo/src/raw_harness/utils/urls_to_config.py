@@ -4,6 +4,8 @@ import json
 import re
 from pathlib import Path
 
+from raw_harness.paths import get_config_path
+
 
 def parse_repo_urls(urls_file: Path) -> list[dict]:
     repos = []
@@ -22,8 +24,8 @@ def parse_repo_urls(urls_file: Path) -> list[dict]:
 
 
 def main() -> None:
-    urls_file = Path(__file__).parent / "repo-urls.md"
-    config_file = Path(__file__).parent / "repos-config.json"
+    urls_file = get_config_path("repo-urls.md")
+    config_file = get_config_path("repos-config.json")
     
     if not urls_file.exists():
         print(f"Error: {urls_file} not found")

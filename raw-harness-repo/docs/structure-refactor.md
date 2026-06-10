@@ -50,3 +50,25 @@ utils/test_git_archive.py
   - Refactor reference of download function related files
   - Refactor reference of download function test related files
   - Test download functions
+
+## Decisions Made
+
+### Package Management
+- **Tool**: `pyproject.toml` + `pip install -e .`
+- **Build backend**: `setuptools.build_meta`
+
+### Package Structure
+- **Layout**: `src/raw_harness/` (src layout)
+- **`__init__.py` files**: Empty (no re-exports)
+
+### Config Path Resolution
+- **Location**: `src/raw_harness/paths.py`
+- **Method**: `get_project_root()` finds nearest ancestor with `pyproject.toml`
+- **Helper**: `get_config_path(name)` returns `get_project_root() / "config" / name`
+
+### File Renames
+- `git-archive.py` → `git_archive.py` (Python naming convention)
+
+### Pytest Configuration
+- `testpaths = ["tests"]` to avoid collecting tests from downloaded repos
+- `norecursedirs = ["config/repos"]` to exclude external repo test files

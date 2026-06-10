@@ -12,13 +12,16 @@ Downloads AI agent skill folders from GitHub repositories using sparse checkout.
 ```bash
 cd raw-harness-repo
 
+# Install the package in development mode
+pip install -e .
+
 # Download all repos
-python3 download_repos.py
+python3 -m raw_harness.download_repos
 ```
 
 ## Configuration
 
-Edit `repos-config.json` to add or modify repositories:
+Edit `config/repos-config.json` to add or modify repositories:
 
 ```json
 {
@@ -34,29 +37,27 @@ Edit `repos-config.json` to add or modify repositories:
 **Important:** 
 - `skill_folders` must be non-empty for each repo
 
-## Files
+## Project Structure
 
-| File | Purpose                                          |
-|------|--------------------------------------------------|
-| `repos-config.json` | Repository URLs and skill folder paths           |
-| `download_repos.py` | Main script - downloads/updates repos            |
-| `dir-download.py` | SparseCheckoutManager implementation             |
-| `urls_to_config.py` | Helper: converts `repo-urls.md` to config        |
-| `utils/git-archive.py` | Archive/restore `.git` folders for index cleanup |
-| `test_download_repos.py` | Tests for download_repos.py                      |
-| `test_urls_to_config.py` | Tests for urls_to_config.py                      |
-| `utils/test_git_archive.py` | Tests for git-archive.py                         |
-
-## Testing
-
-Run all tests:
-```bash
-python3 -m pytest test_download_repos.py test_urls_to_config.py utils/test_git_archive.py -v
 ```
-
-Run with coverage:
-```bash
-python3 -m pytest test_download_repos.py test_urls_to_config.py utils/test_git_archive.py --cov=. --cov-report=term-missing
+raw-harness-repo/
+├── src/raw_harness/          # Python package
+│   ├── __init__.py
+│   ├── paths.py              # Project root discovery
+│   ├── download_repos.py     # Main download script
+│   ├── utils/
+│   │   ├── __init__.py
+│   │   ├── git_archive.py    # Git archive utility
+│   │   └── urls_to_config.py # URL to config converter
+│   └── utils/
+│       ├── __init__.py
+│       └── git_archive.py    # Archive/restore .git folders
+├── tests/                    # Test files
+├── config/                   # Configuration files
+│   ├── repo-urls.md          # Source URLs
+│   └── repos-config.json     # Generated config
+├── docs/                     # Documentation
+└── pyproject.toml            # Package configuration
 ```
 
 ## Storage Structure
@@ -72,37 +73,40 @@ repos/
 │       └── skills/
 ```
 
-## Update Existing Repos
+## Testing
 
-Run the same command to update:
+Run all tests:
 ```bash
-python3 download_repos.py
+python3 -m pytest
 ```
-
-The script detects existing repos and runs `git pull` instead of cloning.
 
 ## `.git` Management
 
-Archived `.git` folders can cause noise when indexing `raw-harness-repo/repos`. Use `git-archive.py` to move them:
+`.git` folders are automatically managed during batch operations:
+
+- **Before `download_repos.py` runs:** Restores `.git` folders from `.tmp_store/git-folders.tar.gz` (if archive exists)
+- **After `download_repos.py` finishes:** Archives all `.git` folders to `.tmp_store/git-folders.tar.gz`
+
+This maintains "one git state at a time" — `.git` folders exist only during active operations.
+
+### Manual CLI Usage
+
+For manual archive/restore outside of batch operations:
 
 ```bash
 cd raw-harness-repo
 
 # Archive .git folders to .tmp_store/git-folders.tar.gz (deletes originals)
-python3 utils/git-archive.py move
+python3 -m raw_harness.utils.git_archive move
 
 # Restore .git folders from archive
-python3 utils/git-archive.py restore
+python3 -m raw_harness.utils.git_archive restore
 ```
-
-**What it does:**
-- `move`: Walks `repos/{owner}/{repo}/` for `.git` dirs, creates `.tmp_store/git-folders.tar.gz`, deletes originals
-- `restore`: Extracts archive back to original locations (overwrites existing `.git` dirs)
 
 ## Troubleshooting
 
 **"skill_folders is empty"**  
-→ Edit `repos-config.json` and add folder paths
+→ Edit `config/repos-config.json` and add folder paths
 
 **"Folders not found in repo after checkout"**  
 → Check that folder paths exist in the remote repository  

@@ -150,9 +150,6 @@ ehthumbs.db
 Desktop.ini
 
 # Project scopt
-!tech-spike/my-tgcf/.venv
-tgcf.config.json
-tech-spike/my-tgcf/old_logs.txt
-tech-spike/my-tgcf/.tmp
 .sisyphus/boulder.json
 .tmp
+raw-harness-repo/.tmp_store

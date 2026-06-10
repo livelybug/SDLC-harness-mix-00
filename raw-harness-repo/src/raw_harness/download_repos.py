@@ -6,6 +6,9 @@ import re
 import sys
 from pathlib import Path
 
+from raw_harness.paths import get_config_path, get_project_root
+from raw_harness.utils.git_archive import move_git_folders, restore_git_folders
+
 sys.path.insert(0, str(Path(__file__).parent))
 dir_download = importlib.import_module("dir-download")
 SparseCheckoutManager = dir_download.SparseCheckoutManager
@@ -51,8 +54,8 @@ def process_repo(repo_config: dict, storage_base: Path) -> tuple[str, bool, str]
 
 
 def main() -> None:
-    config_file = Path(__file__).parent / "repos-config.json"
-    storage_base = Path(__file__).parent / "repos"
+    config_file = get_config_path("repos-config.json")
+    storage_base = get_project_root() / "repos"
     
     if not config_file.exists():
         print(f"Error: {config_file} not found")
@@ -68,10 +71,24 @@ def main() -> None:
     
     storage_base.mkdir(exist_ok=True)
     
+    # Restore .git folders if archive exists (so git operations can work)
+    archive_path = get_project_root() / ".tmp_store" / "git-folders.tar.gz"
+    if archive_path.exists():
+        try:
+            restore_git_folders()
+        except Exception as e:
+            print(f"Warning: Failed to restore .git folders: {e}")
+    
     results = []
     for repo_config in repos:
         result = process_repo(repo_config, storage_base)
         results.append(result)
+    
+    # Archive .git folders (clean up for indexing)
+    try:
+        move_git_folders()
+    except Exception as e:
+        print(f"Warning: Failed to archive .git folders: {e}")
     
     print("\n" + "=" * 60)
     print("SUMMARY")

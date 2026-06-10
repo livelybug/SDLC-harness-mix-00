@@ -5,9 +5,11 @@ import sys
 import tarfile
 from pathlib import Path
 
+from raw_harness.paths import get_project_root
+
 
 def get_base_dir() -> Path:
-    return Path(__file__).parent.parent
+    return get_project_root()
 
 
 def move_git_folders() -> None:

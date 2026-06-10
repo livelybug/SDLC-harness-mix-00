@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from urls_to_config import parse_repo_urls
+from raw_harness.utils.urls_to_config import parse_repo_urls
 
 
 def test_parse_repo_urls_extracts_urls_from_markdown(tmp_path: Path) -> None:

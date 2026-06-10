@@ -6,7 +6,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from download_repos import extract_owner_repo, get_repo_path, main, process_repo
+from raw_harness.download_repos import extract_owner_repo, get_repo_path, main, process_repo
 
 
 def test_extract_owner_repo_parses_valid_github_url() -> None:
@@ -48,8 +48,8 @@ def test_process_repo_returns_error_for_empty_skill_folders() -> None:
     assert "skill_folders is empty" in message
 
 
-@patch("download_repos.SparseCheckoutManager")
-@patch("download_repos.Path.exists")
+@patch("raw_harness.download_repos.SparseCheckoutManager")
+@patch("raw_harness.download_repos.Path.exists")
 def test_process_repo_calls_setup_for_new_repo(
     mock_exists: MagicMock, mock_manager_class: MagicMock
 ) -> None:
@@ -71,8 +71,8 @@ def test_process_repo_calls_setup_for_new_repo(
     mock_manager.setup.assert_called_once()
 
 
-@patch("download_repos.SparseCheckoutManager")
-@patch("download_repos.Path.exists")
+@patch("raw_harness.download_repos.SparseCheckoutManager")
+@patch("raw_harness.download_repos.Path.exists")
 def test_process_repo_calls_update_for_existing_repo(
     mock_exists: MagicMock, mock_manager_class: MagicMock
 ) -> None:
@@ -94,8 +94,8 @@ def test_process_repo_calls_update_for_existing_repo(
     mock_manager.update.assert_called_once()
 
 
-@patch("download_repos.SparseCheckoutManager")
-@patch("download_repos.Path.exists")
+@patch("raw_harness.download_repos.SparseCheckoutManager")
+@patch("raw_harness.download_repos.Path.exists")
 def test_process_repo_returns_failure_on_exception(
     mock_exists: MagicMock, mock_manager_class: MagicMock
 ) -> None:
@@ -118,15 +118,11 @@ def test_process_repo_returns_failure_on_exception(
 
 
 def test_main_prints_error_when_config_missing(tmp_path: Path, capsys: pytest.CaptureFixture) -> None:
-    with patch("download_repos.Path") as mock_path_class:
-        mock_config_file = MagicMock()
-        mock_config_file.exists.return_value = False
-        mock_config_file.__str__ = lambda self: "/tmp/repos-config.json"
-        
-        mock_parent = MagicMock()
-        mock_parent.__truediv__ = lambda self, x: mock_config_file
-        mock_path_class.return_value.parent = mock_parent
-        
+    mock_config_file = MagicMock()
+    mock_config_file.exists.return_value = False
+    mock_config_file.__str__ = lambda self: "/tmp/repos-config.json"
+    
+    with patch("raw_harness.download_repos.get_config_path", return_value=mock_config_file):
         main()
     
     captured = capsys.readouterr()
@@ -149,11 +145,13 @@ def test_main_prints_summary_with_counts(tmp_path: Path, capsys: pytest.CaptureF
     config_file = tmp_path / "repos-config.json"
     config_file.write_text(json.dumps(config_content))
     
-    with patch("download_repos.Path") as mock_path_class:
-        mock_path_class.return_value.parent = tmp_path
-        mock_path_class.return_value.__truediv__ = lambda self, x: config_file if x == "repos-config.json" else tmp_path / x
-        
-        with patch("download_repos.process_repo") as mock_process:
+    def mock_get_config_path(name: str) -> Path:
+        if name == "repos-config.json":
+            return config_file
+        return tmp_path / name
+    
+    with patch("raw_harness.download_repos.get_config_path", side_effect=mock_get_config_path):
+        with patch("raw_harness.download_repos.process_repo") as mock_process:
             mock_process.side_effect = [
                 ("https://github.com/owner1/repo1.git", True, "Downloaded successfully"),
                 ("https://github.com/owner2/repo2.git", False, "skill_folders is empty")

@@ -1,15 +1,13 @@
 from __future__ import annotations
 
 import shutil
-import sys
 import tarfile
 from pathlib import Path
 from unittest.mock import patch
 
 import pytest
 
-sys.path.insert(0, str(Path(__file__).parent))
-git_archive = __import__("git-archive")
+from raw_harness.utils import git_archive
 
 
 @pytest.fixture
