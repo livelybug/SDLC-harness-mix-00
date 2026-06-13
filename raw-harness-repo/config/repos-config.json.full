@@ -1,0 +1,42 @@
+{
+  "repos": [
+    {
+      "url": "https://github.com/obra/superpowers.git",
+      "skill_folders": ["skills/"]
+    },
+    {
+      "url": "https://github.com/mattpocock/skills.git",
+      "skill_folders": ["skills/"]
+    },
+    {
+      "url": "https://github.com/affaan-m/ECC.git",
+      "skill_folders": ["skills/"]
+    },
+    {
+      "url": "https://github.com/Fission-AI/OpenSpec.git",
+      "skill_folders": ["src/core/templates/workflows/"]
+    },
+    {
+      "url": "https://github.com/mindfold-ai/Trellis.git",
+      "skill_folders": [".agents/skills/"]
+    },
+    {
+      "url": "https://github.com/garrytan/gstack.git",
+      "skill_folders": ["docs/"]
+    },
+    {
+      "url": "https://github.com/open-gsd/gsd-core.git",
+      "skill_folders": ["commands/gsd/", "gsd-core/workflows/", "agents/"]
+    },
+    {
+      "url": "https://github.com/EveryInc/compound-engineering-plugin.git",
+      "skill_folders": ["docs/skills/"]
+    }
+  ],
+  "settings": {
+    "storage_dir": "repos",
+    "repos_key": "repos",
+    "git_archive_dir": ".tmp_store",
+    "git_archive_filename": "git-folders.tar.gz"
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "repos": [
+    {
+      "url": "https://github.com/garrytan/gstack.git",
+      "skill_folders": ["docs/"]
+    }
+  ],
+  "settings": {
+    "storage_dir": "repos",
+    "repos_key": "repos",
+    "git_archive_dir": ".tmp_store",
+    "git_archive_filename": "git-folders.tar.gz"
+  }
+}
