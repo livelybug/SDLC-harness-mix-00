@@ -55,7 +55,6 @@ def process_repo(repo_config: dict, storage_base: Path) -> tuple[str, bool, str]
 
 def main() -> None:
     config_file = get_config_path("repos-config.json")
-    storage_base = get_project_root() / "repos"
     
     if not config_file.exists():
         print(f"Error: {config_file} not found")
@@ -63,7 +62,9 @@ def main() -> None:
         return
     
     config = json.loads(config_file.read_text())
-    repos = config.get("repos", [])
+    settings = config.get("settings", {})
+    repos = config.get(settings.get("repos_key", "repos"), [])
+    storage_base = get_project_root() / settings.get("storage_dir", "repos")
     
     if not repos:
         print("No repos in config")
@@ -72,7 +73,11 @@ def main() -> None:
     storage_base.mkdir(exist_ok=True)
     
     # Restore .git folders if archive exists (so git operations can work)
-    archive_path = get_project_root() / ".tmp_store" / "git-folders.tar.gz"
+    archive_path = (
+        get_project_root()
+        / settings.get("git_archive_dir", ".tmp_store")
+        / settings.get("git_archive_filename", "git-folders.tar.gz")
+    )
     if archive_path.exists():
         try:
             restore_git_folders()
