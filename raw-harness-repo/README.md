@@ -11,6 +11,7 @@ Downloads AI agent skill folders from GitHub repositories using sparse checkout.
 
 ```bash
 cd raw-harness-repo
+source .venv/bin/activate
 
 # Install the package in development mode
 pip install -e .
@@ -37,6 +38,15 @@ Edit `config/repos-config.json` to add or modify repositories:
 **Important:** 
 - `skill_folders` must be non-empty for each repo
 
+### Config file location
+
+By default, `download_repos.py` reads `config/repos-config.json`. To use a different config file, set the `REPOS_CONFIG_FILE` environment variable to the filename (e.g. `custom-config.json`); the file is still resolved relative to `config/`. Values from a `.env` file in the project root are loaded first; shell-exported env vars take precedence over `.env`.
+
+```bash
+# .env in the project root
+REPOS_CONFIG_FILE=repos-config.json
+```
+
 ## Project Structure
 
 ```
@@ -47,11 +57,8 @@ raw-harness-repo/
 │   ├── download_repos.py     # Main download script
 │   ├── utils/
 │   │   ├── __init__.py
-│   │   ├── git_archive.py    # Git archive utility
+│   │   ├── git_archive.py    # Archive/restore .git folders
 │   │   └── urls_to_config.py # URL to config converter
-│   └── utils/
-│       ├── __init__.py
-│       └── git_archive.py    # Archive/restore .git folders
 ├── tests/                    # Test files
 ├── config/                   # Configuration files
 │   ├── repo-urls.md          # Source URLs

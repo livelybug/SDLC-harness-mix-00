@@ -163,3 +163,97 @@ def test_main_prints_summary_with_counts(tmp_path: Path, capsys: pytest.CaptureF
     assert "Total: 2" in captured.out
     assert "Success: 1" in captured.out
     assert "Failed: 1" in captured.out
+
+
+def test_main_uses_default_config_name_when_env_unset(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture
+) -> None:
+    monkeypatch.delenv("REPOS_CONFIG_FILE", raising=False)
+
+    requested: list[str] = []
+
+    def mock_get_config_path(name: str) -> Path:
+        requested.append(name)
+        mock_file = MagicMock()
+        mock_file.exists.return_value = False
+        mock_file.__str__ = lambda self: f"/tmp/{name}"
+        return mock_file
+
+    with patch("raw_harness.download_repos.get_config_path", side_effect=mock_get_config_path):
+        main()
+
+    assert requested == ["repos-config.json"]
+    captured = capsys.readouterr()
+    assert "not found" in captured.out
+
+
+def test_main_reads_config_name_from_env_var(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture
+) -> None:
+    monkeypatch.setenv("REPOS_CONFIG_FILE", "custom-config.json")
+
+    requested: list[str] = []
+
+    def mock_get_config_path(name: str) -> Path:
+        requested.append(name)
+        mock_file = MagicMock()
+        mock_file.exists.return_value = False
+        mock_file.__str__ = lambda self: f"/tmp/{name}"
+        return mock_file
+
+    with patch("raw_harness.download_repos.get_config_path", side_effect=mock_get_config_path):
+        main()
+
+    assert requested == ["custom-config.json"]
+
+
+def test_main_loads_env_file_from_project_root(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture
+) -> None:
+    env_file = tmp_path / ".env"
+    env_file.write_text("REPOS_CONFIG_FILE=from-dotenv.json\n# comment\n\nBAD LINE\n")
+    monkeypatch.delenv("REPOS_CONFIG_FILE", raising=False)
+
+    requested: list[str] = []
+
+    def mock_get_config_path(name: str) -> Path:
+        requested.append(name)
+        mock_file = MagicMock()
+        mock_file.exists.return_value = False
+        mock_file.__str__ = lambda self: f"/tmp/{name}"
+        return mock_file
+
+    def mock_get_project_root() -> Path:
+        return tmp_path
+
+    with patch("raw_harness.download_repos.get_project_root", side_effect=mock_get_project_root):
+        with patch("raw_harness.download_repos.get_config_path", side_effect=mock_get_config_path):
+            main()
+
+    assert requested == ["from-dotenv.json"]
+
+
+def test_main_env_var_overrides_env_file(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture
+) -> None:
+    env_file = tmp_path / ".env"
+    env_file.write_text("REPOS_CONFIG_FILE=from-dotenv.json\n")
+    monkeypatch.setenv("REPOS_CONFIG_FILE", "from-shell.json")
+
+    requested: list[str] = []
+
+    def mock_get_config_path(name: str) -> Path:
+        requested.append(name)
+        mock_file = MagicMock()
+        mock_file.exists.return_value = False
+        mock_file.__str__ = lambda self: f"/tmp/{name}"
+        return mock_file
+
+    def mock_get_project_root() -> Path:
+        return tmp_path
+
+    with patch("raw_harness.download_repos.get_project_root", side_effect=mock_get_project_root):
+        with patch("raw_harness.download_repos.get_config_path", side_effect=mock_get_config_path):
+            main()
+
+    assert requested == ["from-shell.json"]
