@@ -117,7 +117,7 @@ python3 -m raw_harness.utils.git_archive restore
 
 **"Folders not found in repo after checkout"**  
 → Check that folder paths exist in the remote repository  
-→ Ensure paths do NOT have trailing slashes
+→ Ensure paths is abs path and do have leading slashes (use `/skills/` not `skills/`)
 
 **"Invalid GitHub URL"**  
 → URL must match: `https://github.com/owner/repo.git`

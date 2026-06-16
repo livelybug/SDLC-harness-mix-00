@@ -3,7 +3,6 @@
 ## Problem
 
 When using sparse checkout to download specific folders from GitHub repositories, extra folders that weren't requested were also being downloaded. For example:
-- `raw-harness-repo/repos/affaan-m/ECC/docs` - not requested
 - `raw-harness-repo/repos/garrytan/gstack/ios-qa` - not requested
 
 ## Root Cause
@@ -31,20 +30,7 @@ In true cone mode, paths are strictly evaluated from the repository root, so `/d
 
 Paths starting with `/` anchor to the repo root, ensuring cone mode works correctly and only the specified directories are materialized.
 
-### 2. Prune worktree after checkout
-
-Added `_prune_worktree_to_requested_folders()` method that removes any files/directories not in the requested folder list, as a safety net against stale files from previous operations.
-
-## Testing
-
-The fix includes comprehensive tests:
-
-- `test_setup_materializes_only_requested_folder` - Verifies only requested folders are downloaded
-- `test_setup_strips_trailing_slashes_from_config` - Handles trailing slashes in config
-- `test_prune_removes_stale_files_and_dirs` - Verifies pruning works correctly
-- `test_prune_keeps_nested_requested_paths` - Handles nested paths like `src/core/templates/workflows`
-
 ## References
 
-- [Git Sparse Checkout Documentation](https://git-scm.com/docs/git-sparse-checkout)
+- raw-harness-repo/docs/sparse-checkout-demos.md
 - Issue #4: undesirable folders downloaded

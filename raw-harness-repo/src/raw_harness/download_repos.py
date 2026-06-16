@@ -2,9 +2,12 @@ from __future__ import annotations
 
 import importlib
 import json
+import os
 import re
 import sys
 from pathlib import Path
+
+from dotenv import load_dotenv
 
 from raw_harness.paths import get_config_path, get_project_root
 from raw_harness.utils.git_archive import move_git_folders, restore_git_folders
@@ -54,7 +57,9 @@ def process_repo(repo_config: dict, storage_base: Path) -> tuple[str, bool, str]
 
 
 def main() -> None:
-    config_file = get_config_path("repos-config.json")
+    load_dotenv(get_project_root() / ".env")
+    config_name = os.environ.get("REPOS_CONFIG_FILE", "repos-config.json")
+    config_file = get_config_path(config_name)
     
     if not config_file.exists():
         print(f"Error: {config_file} not found")

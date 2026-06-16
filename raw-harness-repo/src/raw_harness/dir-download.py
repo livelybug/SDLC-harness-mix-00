@@ -3,7 +3,7 @@ from __future__ import annotations
 import os
 import shutil
 import subprocess
-
+from raw_harness.paths import make_relative_path
 
 class SparseCheckoutManager:
     def __init__(self, repo_url: str, folder_paths: list[str], local_storage_path: str):
@@ -46,19 +46,24 @@ class SparseCheckoutManager:
 
         os.makedirs(self.repo_path, exist_ok=True)
 
+        # Auto-detect default branch
+        self._default_branch = self._detect_default_branch()
+        # print("self._default_branch", self._default_branch)
+
         # Initialize git repo
-        subprocess.run(["git", "init"], cwd=self.repo_path, check=True)
+        subprocess.run(["git", "init"], 
+                    cwd=self.repo_path, text=True, check=True)
 
         # Add remote
         subprocess.run(
             ["git", "remote", "add", "origin", self.repo_url],
-            cwd=self.repo_path, check=True
+            cwd=self.repo_path, text=True, check=True
         )
 
         # Enable sparse checkout
         subprocess.run(
             ["git", "config", "core.sparseCheckout", "true"],
-            cwd=self.repo_path, check=True
+            cwd=self.repo_path, text=True, check=True
         )
 
         # Write ALL folder paths to sparse-checkout file (one per line)
@@ -68,16 +73,22 @@ class SparseCheckoutManager:
                 folder=os.path.join(folder, '')
                 f.write(f"{folder}\n")
 
-        # Auto-detect default branch
-        self._default_branch = self._detect_default_branch()
-
-        # Initial pull
         subprocess.run(
-            ["git", "pull", "origin", self._default_branch],
-            cwd=self.repo_path, check=True
+            ["git", "sparse-checkout", "reapply"],
+            cwd=self.repo_path, text=True, check=True
         )
 
-        # Verify all paths exist
+        subprocess.run(
+            ["git", "fetch", "--depth", "1", "origin", self._default_branch],
+            cwd=self.repo_path, text=True, check=True
+        )
+
+        subprocess.run(
+            ["git", "checkout", self._default_branch],
+            cwd=self.repo_path, text=True, check=True
+        )
+
+        # self._prune_worktree_to_requested_folders()  # Todo: to test and enable
         self._verify_paths_exist()
 
         paths_display = ", ".join(self.folder_paths)
@@ -88,6 +99,7 @@ class SparseCheckoutManager:
         """Raise error if any requested folder is missing after checkout."""
         missing = []
         for folder in self.folder_paths:
+            folder = make_relative_path(folder)
             full_path = os.path.join(self.repo_path, folder)
             if not os.path.isdir(full_path):
                 missing.append(folder)
@@ -98,7 +110,30 @@ class SparseCheckoutManager:
                 f"Check that all paths exist on remote."
             )
 
-    def update(self) -> str:
+    def _prune_worktree_to_requested_folders(self) -> None:
+        """Delete worktree entries outside the requested folders.
+
+        Non-cone sparse-checkout does not evict files left over from a prior
+        full checkout, so we remove anything not under one of the requested
+        folder paths (issue #4).
+        """
+        keep = {os.path.normpath(f.rstrip("/")) for f in self.folder_paths}
+        for entry in os.listdir(self.repo_path):
+            if entry == ".git":
+                continue
+            entry_norm = os.path.normpath(entry)
+            if entry_norm in keep:
+                continue
+            if any(p == entry_norm or p.startswith(entry_norm + os.sep)
+                   for p in keep):
+                continue
+            target = os.path.join(self.repo_path, entry)
+            if os.path.isdir(target):
+                shutil.rmtree(target)
+            else:
+                os.remove(target)
+
+    def update(self) -> str:  # Todo: dedup with setup(self)
         """Update all folders to the latest version."""
         if not os.path.exists(self.repo_path):
             raise RuntimeError("Repository not found. Run setup() first.")
@@ -107,15 +142,22 @@ class SparseCheckoutManager:
         if self._default_branch is None:
             self._default_branch = self._detect_default_branch()
 
-        # Fetch latest changes
+        # Write ALL folder paths to sparse-checkout file (one per line) # Todo: dedup
+        sparse_path = os.path.join(self.repo_path, ".git", "info", "sparse-checkout")
+        with open(sparse_path, "w") as f:
+            for folder in self.folder_paths:
+                folder=os.path.join(folder, '')
+                f.write(f"{folder}\n")
+
+        # Re-apply sparsity so any newly-removed upstream paths are pruned  # Todo: to verify
         subprocess.run(
-            ["git", "fetch", "origin"],
-            cwd=self.repo_path, check=True
+            ["git", "sparse-checkout", "reapply"],
+            cwd=self.repo_path, text=True, check=True
         )
 
         # Pull updates (only affects sparse checkout folders)
         result = subprocess.run(
-            ["git", "pull", "origin", self._default_branch],
+            ["git", "pull", "--depth", "1", "origin", self._default_branch],
             cwd=self.repo_path, capture_output=True, text=True
         )
 
