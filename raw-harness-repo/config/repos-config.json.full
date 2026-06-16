@@ -10,7 +10,7 @@
     },
     {
       "url": "https://github.com/affaan-m/ECC.git",
-      "skill_folders": ["/skills/"]
+      "skill_folders": ["/skills/", "/.agents/skills/", "/agents/"]
     },
     {
       "url": "https://github.com/Fission-AI/OpenSpec.git",
@@ -18,7 +18,7 @@
     },
     {
       "url": "https://github.com/mindfold-ai/Trellis.git",
-      "skill_folders": ["/.agents/skills/"]
+      "skill_folders": ["/.agents/skills/", "/.trellis/agents/"]
     },
     {
       "url": "https://github.com/garrytan/gstack.git",
@@ -30,7 +30,7 @@
     },
     {
       "url": "https://github.com/EveryInc/compound-engineering-plugin.git",
-      "skill_folders": ["/docs/skills/"]
+      "skill_folders": ["/docs/skills/", "/plugins/compound-engineering/agents/"]
     }
   ],
   "settings": {

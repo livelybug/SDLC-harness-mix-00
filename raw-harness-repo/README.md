@@ -1,6 +1,6 @@
 # Harness Mix Download
 
-Downloads AI agent skill folders from GitHub repositories using sparse checkout.
+Downloads AI coding skill and specialized agent prompt template folders from GitHub repositories using sparse checkout.
 
 ## Prerequisites
 
@@ -15,6 +15,9 @@ source .venv/bin/activate
 
 # Install the package in development mode
 pip install -e .
+
+# For a clean download, optional
+# rm -rf repos/ .tmp_store/
 
 # Download all repos
 python3 -m raw_harness.download_repos
