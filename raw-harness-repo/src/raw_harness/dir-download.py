@@ -4,9 +4,16 @@ import os
 import shutil
 import subprocess
 from raw_harness.paths import make_relative_path
+from raw_harness.skill_folders import discover_skill_folders
 
 class SparseCheckoutManager:
-    def __init__(self, repo_url: str, folder_paths: list[str], local_storage_path: str):
+    def __init__(
+        self,
+        repo_url: str,
+        folder_paths: list[str],
+        local_storage_path: str,
+        pre_down_hook: bool = False,
+    ):
         """
         Manage sparse checkouts of multiple GitHub folders from a single repo.
 
@@ -14,12 +21,15 @@ class SparseCheckoutManager:
             repo_url: "https://github.com/username/repo.git"
             folder_paths: List of folder paths, e.g. ["pandas/io", "pandas/core"]
             local_storage_path: Where to store the git repo (persistent)
+            pre_down_hook: When True, run skill-folder discovery before writing
+                the sparse-checkout file. Default is False.
         """
         if not folder_paths:
             raise ValueError("folder_paths must be non-empty")
         self.repo_url = repo_url
         self.folder_paths = list(folder_paths)       # defensive copy
         self.repo_path = local_storage_path
+        self.pre_down_hook = pre_down_hook
         self._default_branch: str | None = None       # detected in setup()
 
     def _detect_default_branch(self) -> str:
@@ -38,6 +48,38 @@ class SparseCheckoutManager:
                 return branch
         raise RuntimeError(f"Could not detect default branch for {self.repo_url}")
 
+    def run_pre_down_hook(self) -> list[str]:
+        """If a pre-down hook is configured for this repo, run it and return extra folder paths.
+
+        Returns an empty list when the hook is disabled, when the default
+        branch has not been detected yet, or when no strategy matches the
+        repo URL. Discovery failures are logged and treated as a no-op so a
+        broken discovery never breaks a working static config.
+        """
+        if not self.pre_down_hook:
+            return []
+        if self._default_branch is None:
+            return []
+        try:
+            extra = discover_skill_folders(
+                self.repo_url, self.repo_path, self._default_branch
+            )
+        except Exception as exc:
+            print(
+                f"Warning: pre_down_hook failed for {self.repo_url}: {exc}. "
+                "Falling back to static config."
+            )
+            return []
+        if not extra:
+            # Flag is on but no skill folder matched — surface it so operators notice.
+            from raw_harness.skill_folders import GSTACK_URL_PATTERN
+            if self.repo_url != GSTACK_URL_PATTERN:
+                print(
+                    f"Warning: pre_down_hook is True for {self.repo_url} "
+                    "but no skill-folder discovery strategy matches this URL."
+                )
+        return extra
+
     def setup(self) -> None:
         """Initial setup of sparse checkout for all requested folders."""
         if os.path.exists(self.repo_path):
@@ -46,12 +88,8 @@ class SparseCheckoutManager:
 
         os.makedirs(self.repo_path, exist_ok=True)
 
-        # Auto-detect default branch
-        self._default_branch = self._detect_default_branch()
-        # print("self._default_branch", self._default_branch)
-
         # Initialize git repo
-        subprocess.run(["git", "init"], 
+        subprocess.run(["git", "init"],
                     cwd=self.repo_path, text=True, check=True)
 
         # Add remote
@@ -60,11 +98,28 @@ class SparseCheckoutManager:
             cwd=self.repo_path, text=True, check=True
         )
 
+        # Auto-detect default branch (must happen after `git remote add`)
+        self._default_branch = self._detect_default_branch()
+        # print("self._default_branch", self._default_branch)
+
         # Enable sparse checkout
         subprocess.run(
             ["git", "config", "core.sparseCheckout", "true"],
             cwd=self.repo_path, text=True, check=True
         )
+
+        # Fetch the default branch early so the pre_down_hook (if any) can run
+        # `git ls-tree origin/<branch>` against a real remote-tracking ref.
+        subprocess.run(
+            ["git", "fetch", "--depth", "1", "origin", self._default_branch],
+            cwd=self.repo_path, text=True, check=True
+        )
+
+        # Run pre-down hook (e.g. skill-folder discovery) and merge results
+        # in-memory. The static config on disk is never mutated.
+        extra = self.run_pre_down_hook()
+        if extra:
+            self.folder_paths = list(dict.fromkeys([*self.folder_paths, *extra]))
 
         # Write ALL folder paths to sparse-checkout file (one per line)
         sparse_path = os.path.join(self.repo_path, ".git", "info", "sparse-checkout")
@@ -75,11 +130,6 @@ class SparseCheckoutManager:
 
         subprocess.run(
             ["git", "sparse-checkout", "reapply"],
-            cwd=self.repo_path, text=True, check=True
-        )
-
-        subprocess.run(
-            ["git", "fetch", "--depth", "1", "origin", self._default_branch],
             cwd=self.repo_path, text=True, check=True
         )
 

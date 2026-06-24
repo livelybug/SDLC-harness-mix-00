@@ -16,3 +16,6 @@ where = ["src"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 norecursedirs = ["config/repos"]
+markers = [
+    "integration: tests that require network access and clone real repos",
+]

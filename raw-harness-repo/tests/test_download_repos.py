@@ -257,3 +257,51 @@ def test_main_env_var_overrides_env_file(
             main()
 
     assert requested == ["from-shell.json"]
+
+
+@patch("raw_harness.download_repos.SparseCheckoutManager")
+@patch("raw_harness.download_repos.Path.exists")
+def test_process_repo_passes_pre_down_hook_to_manager(
+    mock_exists: MagicMock, mock_manager_class: MagicMock
+) -> None:
+    """pre_down_hook from the config entry is forwarded to SparseCheckoutManager."""
+    mock_exists.return_value = False
+    mock_manager = MagicMock()
+    mock_manager_class.return_value = mock_manager
+
+    repo_config = {
+        "url": "https://github.com/garrytan/gstack.git",
+        "skill_folders": ["/docs/"],
+        "pre_down_hook": True,
+    }
+    storage_base = Path("/tmp/repos")
+
+    process_repo(repo_config, storage_base)
+
+    mock_manager_class.assert_called_once_with(
+        repo_url="https://github.com/garrytan/gstack.git",
+        folder_paths=["/docs/"],
+        local_storage_path="/tmp/repos/garrytan/gstack",
+        pre_down_hook=True,
+    )
+
+
+@patch("raw_harness.download_repos.SparseCheckoutManager")
+@patch("raw_harness.download_repos.Path.exists")
+def test_process_repo_defaults_pre_down_hook_false_when_missing(
+    mock_exists: MagicMock, mock_manager_class: MagicMock
+) -> None:
+    """pre_down_hook is False when not present in the config entry."""
+    mock_exists.return_value = False
+    mock_manager_class.return_value = MagicMock()
+
+    repo_config = {
+        "url": "https://github.com/obra/superpowers.git",
+        "skill_folders": ["skills"],
+    }
+    storage_base = Path("/tmp/repos")
+
+    process_repo(repo_config, storage_base)
+
+    _, kwargs = mock_manager_class.call_args
+    assert kwargs["pre_down_hook"] is False

@@ -42,7 +42,8 @@ def process_repo(repo_config: dict, storage_base: Path) -> tuple[str, bool, str]
         manager = SparseCheckoutManager(
             repo_url=url,
             folder_paths=skill_folders,
-            local_storage_path=str(repo_path)
+            local_storage_path=str(repo_path),
+            pre_down_hook=repo_config.get("pre_down_hook", False),
         )
         
         if repo_path.exists():
