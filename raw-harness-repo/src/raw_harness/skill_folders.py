@@ -7,11 +7,6 @@ from typing import Protocol
 
 logger = logging.getLogger(__name__)
 
-# URL pattern matched by the gstack strategy. Kept here (not in config) because
-# the strategy is intrinsic to the harness's knowledge of gstack's layout.
-GSTACK_URL_PATTERN = "https://github.com/garrytan/gstack.git"
-
-
 def _normalize_folder(path: str) -> str:
     """Strip trailing slashes and ensure a single leading slash."""
     cleaned = path.strip().rstrip("/")
@@ -59,6 +54,4 @@ def discover_skill_folders(repo_url: str, repo_path: str, branch: str) -> list[s
     New strategies are added here (not in the strategy module) so the matcher
     can grow without coupling strategy classes to a URL constant.
     """
-    if repo_url == GSTACK_URL_PATTERN:
-        return GstackSkillDiscovery().discover(repo_path, branch)
-    return []
+    return GstackSkillDiscovery().discover(repo_path, branch)

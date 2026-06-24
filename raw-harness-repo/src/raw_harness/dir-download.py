@@ -72,12 +72,10 @@ class SparseCheckoutManager:
             return []
         if not extra:
             # Flag is on but no skill folder matched — surface it so operators notice.
-            from raw_harness.skill_folders import GSTACK_URL_PATTERN
-            if self.repo_url != GSTACK_URL_PATTERN:
-                print(
-                    f"Warning: pre_down_hook is True for {self.repo_url} "
-                    "but no skill-folder discovery strategy matches this URL."
-                )
+            print(
+                f"Warning: pre_down_hook is True for {self.repo_url} "
+                "but no skill-folder discovery strategy matches this URL."
+            )
         return extra
 
     def setup(self) -> None:
