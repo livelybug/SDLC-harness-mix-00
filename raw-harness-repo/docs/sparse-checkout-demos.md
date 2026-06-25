@@ -5,7 +5,7 @@
 git clone --no-checkout https://github.com/garrytan/gstack.git --depth 1 --single-branch
 cd gstack
 git config core.sparseCheckout true
-echo '/docs/' > .git/info/sparse-checkout
+echo '/docs' > .git/info/sparse-checkout
 echo '/agents/' >> .git/info/sparse-checkout
 git sparse-checkout reapply
 git pull

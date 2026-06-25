@@ -123,7 +123,7 @@ class SparseCheckoutManager:
         sparse_path = os.path.join(self.repo_path, ".git", "info", "sparse-checkout")
         with open(sparse_path, "w") as f:
             for folder in self.folder_paths:
-                folder=os.path.join(folder, '')
+                # folder=os.path.join(folder, '') # Comment out to accept files in checkout as well, not only folder
                 f.write(f"{folder}\n")
 
         subprocess.run(
@@ -149,7 +149,7 @@ class SparseCheckoutManager:
         for folder in self.folder_paths:
             folder = make_relative_path(folder)
             full_path = os.path.join(self.repo_path, folder)
-            if not os.path.isdir(full_path):
+            if not (os.path.isdir(full_path) or os.path.isfile(full_path)):
                 missing.append(folder)
         if missing:
             raise FileNotFoundError(
@@ -190,16 +190,40 @@ class SparseCheckoutManager:
         if self._default_branch is None:
             self._default_branch = self._detect_default_branch()
 
+        # Fetch the default branch early so the pre_down_hook (if any) can run
+        # `git ls-tree origin/<branch>` against a real remote-tracking ref.
+        subprocess.run(
+            ["git", "fetch", "--depth", "1", "origin", self._default_branch],
+            cwd=self.repo_path, text=True, check=True
+        )
+
+        result = subprocess.run(
+            ["git", "reset", "--hard", "origin/" + self._default_branch],
+            cwd=self.repo_path, text=True, check=True
+        )
+
+        # Run pre-down hook (e.g. skill-folder discovery) and merge results
+        # in-memory. The static config on disk is never mutated.
+        extra = self.run_pre_down_hook()
+        if extra:
+            self.folder_paths = list(dict.fromkeys([*self.folder_paths, *extra]))            
+        print("self.folder_paths 01: ", self.folder_paths)
+
         # Write ALL folder paths to sparse-checkout file (one per line) # Todo: dedup
         sparse_path = os.path.join(self.repo_path, ".git", "info", "sparse-checkout")
         with open(sparse_path, "w") as f:
             for folder in self.folder_paths:
-                folder=os.path.join(folder, '')
+                # folder=os.path.join(folder, '')   # Comment out to accept files in checkout as well, not only folder
                 f.write(f"{folder}\n")
 
         # Re-apply sparsity so any newly-removed upstream paths are pruned  # Todo: to verify
         subprocess.run(
             ["git", "sparse-checkout", "reapply"],
+            cwd=self.repo_path, text=True, check=True
+        )
+
+        result = subprocess.run(
+            ["git", "reset", "--hard", "origin/" + self._default_branch],
             cwd=self.repo_path, text=True, check=True
         )
 
@@ -212,7 +236,7 @@ class SparseCheckoutManager:
         if "Already up to date" in result.stdout:
             print("Folders are already up to date")
         else:
-            print("Update completed successfully")
+            print("Update completed successfully: ", self.repo_path)
             print(result.stdout)
 
         # Re-verify after update (paths could have been removed upstream)

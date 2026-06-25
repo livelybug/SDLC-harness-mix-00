@@ -45,7 +45,7 @@ def process_repo(repo_config: dict, storage_base: Path) -> tuple[str, bool, str]
             local_storage_path=str(repo_path),
             pre_down_hook=repo_config.get("pre_down_hook", False),
         )
-        
+
         if repo_path.exists():
             manager.update()
             return (url, True, "Updated successfully")

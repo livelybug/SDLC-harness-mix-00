@@ -41,10 +41,8 @@ class GstackSkillDiscovery:
             line = line.strip()
             if not line:
                 continue
-            # Convert file path to its parent folder, then normalize.
-            folder = posixpath.dirname(line)
-            if folder and folder != ".":
-                folders.add(_normalize_folder("/" + folder))
+            if line != ".":
+                folders.add(_normalize_folder("/" + line))
         return sorted(folders)
 
 
