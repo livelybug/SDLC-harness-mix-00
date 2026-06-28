@@ -22,7 +22,8 @@
     },
     {
       "url": "https://github.com/garrytan/gstack.git",
-      "skill_folders": ["/docs/"]
+      "skill_folders": ["/docs/skills.md"],
+      "pre_down_hook": true
     },
     {
       "url": "https://github.com/open-gsd/gsd-core.git",
@@ -30,7 +31,11 @@
     },
     {
       "url": "https://github.com/EveryInc/compound-engineering-plugin.git",
-      "skill_folders": ["/docs/skills/", "/plugins/compound-engineering/agents/"]
+      "skill_folders": ["/docs/skills/", "/skills/"]
+    },
+    {
+      "url": "https://github.com/addyosmani/agent-skills.git",
+      "skill_folders": ["/agents/", "/commands/", "/skills/"]
     }
   ],
   "settings": {
