@@ -2,7 +2,8 @@
   "repos": [
     {
       "url": "https://github.com/garrytan/gstack.git",
-      "skill_folders": ["/docs/"]
+      "skill_folders": ["/docs/skills.md"],
+      "pre_down_hook": true
     }
   ],
   "settings": {

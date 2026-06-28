@@ -1,4 +1,6 @@
-# Plan: Auto-discover gstack skill folders (issue #8)
+# Plan: Auto-discover gstack skill folders
+
+Issue: https://github.com/livelybug/SDLC-harness-mix-00/issues/8
 
 ## Context
 
@@ -10,7 +12,7 @@ The user proposed running `git ls-tree` against `origin/HEAD` to discover the sk
 
 The proposal is **directionally correct** but has three real issues that need correction:
 
-1. **`git ls-tree origin/HEAD` will fail at the proposed injection point.** `origin/HEAD` is a remote-tracking ref that only exists after `git fetch`. The user proposed injecting *immediately after `# Add remote`*, but the current `setup()` flow doesn't fetch until much later (line 82 of `dir-download.py`). We need to move the fetch **earlier** (just after the remote is added and sparse-checkout is enabled) so that `origin/<branch>` exists when `git ls-tree` runs.
+1. **`git ls-tree origin/HEAD` will fail at the proposed injection point.** `origin/HEAD` is a remote-tracking ref that only exists after `git fetch`. The user proposed injecting *immediately after `# Add remote`*, but the current `setup()` flow doesn't fetch until later. We need to move the fetch **earlier** (just after the remote is added and sparse-checkout is enabled) so that `origin/<branch>` exists when `git ls-tree` runs.
 
 2. **Mutating `repos-config.json` on disk is the wrong default.** It creates a stale-by-design config: if gstack upstream adds/removes a skill folder, the persisted JSON drifts. The harness should augment `self.folder_paths` **in memory** and let the static config stay as a human-authored source of truth. If persistence is wanted later, gate it behind an opt-in env var (e.g. `PERSIST_DISCOVERY=1`).
 
@@ -22,7 +24,7 @@ Everything else in the proposal (the `git ls-tree` pipeline, `grep '/SKILL\.md$'
 
 ### Config change: add `pre_down_hook` boolean to repo entries
 
-In `raw-harness-repo/config/repos-config.json` (and `.full`, `.test`), each repo entry may now have a `pre_down_hook: true` flag. When `true`, the manager runs the built-in skill-discovery strategy (currently a single strategy — gstack's `SKILL.md` pattern) for that repo before writing the sparse-checkout file.
+In `raw-harness-repo/config/repos-config.json` (and `repos-config.json.full`, `repos-config.json.test`), each repo entry may now have a `pre_down_hook: true` flag. When `true`, the manager runs the built-in skill-discovery strategy (currently a single strategy — gstack's `SKILL.md` pattern) for that repo before writing the sparse-checkout file.
 
 Updated gstack entry:
 ```json
@@ -39,9 +41,8 @@ The flag defaults to `false` (treated as missing) for any repo that doesn't set 
 
 ### New module: `raw-harness-repo/src/raw_harness/skill_folders.py`
 
-Single responsibility: implement skill-folder discovery strategies.
+Single responsibility: implement skill-folder discovery.
 
-- `class DiscoveryStrategy(Protocol)` — duck-typed interface with `discover(repo_url: str, repo_path: str, branch: str) -> list[str]`.
 - `class GstackSkillDiscovery` — runs the user's shell pipeline against the URL it was given (no hard-coded URL constant):
   ```
   git ls-tree -r origin/<branch> --name-only \
@@ -55,10 +56,10 @@ Single responsibility: implement skill-folder discovery strategies.
 
 ### Modify: `raw-harness-repo/src/raw_harness/dir-download.py`
 
-Reorder `setup()` (line 41) and add a thin hook runner on `SparseCheckoutManager`:
+Reorder `setup()` and add a thin hook runner on `SparseCheckoutManager`:
 
 1. Add `from raw_harness.skill_folders import discover_skill_folders` at the top.
-2. Add an instance attribute to `__init__` to hold the hook flag, defaulted to `False`. Since the manager is constructed from a config entry, the caller (`download_repos.py` `process_repo`, line 32) will pass it in. (See step 7 below for the orchestrator change.)
+2. Add an instance attribute to `__init__` to hold the hook flag, defaulted to `False`. Since the manager is constructed from a config entry, the caller (`download_repos.py` `process_repo`) will pass it in. (See step 7 below for the orchestrator change.)
 3. Add method to `SparseCheckoutManager`:
    ```python
    def run_pre_down_hook(self) -> list[str]:
@@ -69,15 +70,15 @@ Reorder `setup()` (line 41) and add a thin hook runner on `SparseCheckoutManager
            return []
        return discover_skill_folders(self.repo_url, self.repo_path, self._default_branch)
    ```
-4. In `setup()`, **move** the `git fetch --depth 1 origin <branch>` block (currently at line 81) **up** so it runs immediately after `git config core.sparseCheckout true` (line 67). This is the same fetch — moved, not duplicated — so total work is unchanged.
-5. Insert after the moved fetch and **before** the sparse-checkout file is written (currently line 70):
+4. In `setup()`, **move** the `git fetch --depth 1 origin <branch>` block (currently near the end of `setup()`) **up** so it runs immediately after `git config core.sparseCheckout true`. This is the same fetch — moved, not duplicated — so total work is unchanged.
+5. Insert after the moved fetch and **before** the sparse-checkout file is written:
    ```python
    extra = self.run_pre_down_hook()
    self.folder_paths = list(dict.fromkeys([*self.folder_paths, *extra]))
    ```
    This dedupes against the static config, preserves insertion order (static first, then discovered), and reassigns (immutable pattern).
-6. Leave the existing write-to-sparse-checkout-file block (line 70) unchanged — it now writes the augmented list.
-7. Leave the trailing `git sparse-checkout reapply` (line 76) and `git checkout` (line 86) unchanged. The old fetch (line 82) is removed because the moved fetch (step 4) covers it.
+6. Leave the existing write-to-sparse-checkout-file block unchanged — it now writes the augmented list.
+7. Leave the trailing `git sparse-checkout reapply` and `git checkout` unchanged. The old fetch is removed because the moved fetch (step 4) covers it.
 
 ### Modify: `raw-harness-repo/src/raw_harness/download_repos.py`
 
@@ -95,7 +96,7 @@ manager = SparseCheckoutManager(
 
 - `repos-config.json` (only edit the gstack entry to add the flag — same shape as before, no migration needed for other entries).
 - `config/features-locations/gstack.md` — reference doc only.
-- `update()` — its write-to-sparse-checkout-file block (line 146) already iterates `self.folder_paths`, so the augmentation persists naturally across `update()` calls (or is re-discovered on a fresh manager, since the orchestrator constructs a new manager per run).
+- `update()` — its write-to-sparse-checkout-file block already iterates `self.folder_paths`, so the augmentation persists naturally across `update()` calls (or is re-discovered on a fresh manager, since the orchestrator constructs a new manager per run).
 
 ## Test plan
 
@@ -110,7 +111,7 @@ Add to `raw-harness-repo/tests/test_dir_download.py`:
 - `test_setup_writes_augmented_sparse_checkout_file` — mock all subprocess calls; assert `.git/info/sparse-checkout` file contains the union of static + discovered paths.
 
 **Integration test (slow, real network, mark `@pytest.mark.integration`):**
-- `test_gstack_includes_skill_folders` — clone `https://github.com/garrytan/gstack.git` into `tmp_path` with `pre_down_hook=True`; assert `repo_path / "review" / "SKILL.md"` and `repo_path / "docs"` both exist. Pattern matches the existing superpowers integration tests (lines 15–27 of `test_dir_download.py`).
+- `test_gstack_includes_skill_folders` — clone `https://github.com/garrytan/gstack.git` into `tmp_path` with `pre_down_hook=True`; assert `repo_path / "review" / "SKILL.md"` and `repo_path / "docs"` both exist. Pattern matches the existing superpowers integration tests at the top of `test_dir_download.py`.
 
 Also add a test to `tests/test_download_repos.py` to confirm `process_repo` passes `pre_down_hook` through to the manager (mock the manager and assert constructor args).
 
@@ -122,14 +123,14 @@ Minimum viable: the augmented-write unit test (covers end-to-end with mocks). Th
 2. `git ls-tree` returns nothing → return `[]`, don't fail.
 3. `git ls-tree` fails (network blip, branch moved) → catch exception, log warning, return `[]`. Discovery is opportunistic; a broken discovery must not break a working static config.
 4. Discovered path collides with static `/docs/` → dedup handles it.
-5. Trailing slash inconsistency (static uses `/docs/`, pipeline emits `/review`) → canonicalize to no-trailing-slash in memory; the existing `os.path.join(folder, '')` at line 73 re-adds trailing slashes on write.
+5. Trailing slash inconsistency (static uses `/docs/`, pipeline emits `/review`) → canonicalize to no-trailing-slash in memory; the existing `os.path.join(folder, '')` in the sparse-checkout writer re-adds trailing slashes on write.
 6. OpenSpec's skills are TypeScript templates (not `.md` files, per `config/features-locations/OpenSpec.md`) → out of scope; **do not** set `pre_down_hook: true` on OpenSpec — it would silently discover nothing and confuse operators. (Will be obvious to anyone reading the config because the entry has no flag.)
-7. `git ls-tree` may not match if upstream ever moves SKILL.md outside the `*/SKILL.md` pattern — `_verify_paths_exist()` (line 92) will catch a missing discovered folder and raise `FileNotFoundError`, which surfaces as a clean per-repo failure in `download_repos.py`'s `process_repo()` (line 55).
+7. `git ls-tree` may not match if upstream ever moves SKILL.md outside the `*/SKILL.md` pattern — `_verify_paths_exist()` will catch a missing discovered folder and raise `FileNotFoundError`, which surfaces as a clean per-repo failure in `download_repos.py`'s `process_repo()`.
 8. `pre_down_hook: true` on a repo whose URL isn't matched by any registered strategy → returns `[]` silently. Add a `print` warning so it's visible in logs.
 
 ## Critical files
 
-- `/home/burt/p2/src/AI/SDLC-harness-mix/raw-harness-repo/src/raw_harness/dir-download.py` — modify `setup()` flow (lines 41–96), add a method, add a constructor param.
+- `/home/burt/p2/src/AI/SDLC-harness-mix/raw-harness-repo/src/raw_harness/dir-download.py` — modify `setup()` flow, add a method, add a constructor param.
 - `/home/burt/p2/src/AI/SDLC-harness-mix/raw-harness-repo/src/raw_harness/skill_folders.py` — **new** file (~50 lines): strategy, dispatcher.
 - `/home/burt/p2/src/AI/SDLC-harness-mix/raw-harness-repo/src/raw_harness/download_repos.py` — pass `pre_down_hook` into the manager constructor.
 - `/home/burt/p2/src/AI/SDLC-harness-mix/raw-harness-repo/config/repos-config.json` — add `"pre_down_hook": true` to the gstack entry (and `.full`, `.test`).
@@ -138,15 +139,17 @@ Minimum viable: the augmented-write unit test (covers end-to-end with mocks). Th
 
 ## Step-by-step implementation order
 
-1. Create `skill_folders.py` with the strategy and dispatcher (URL is a parameter, not a constant).
-2. Modify `dir-download.py`: add import, add `pre_down_hook` param to `__init__`, add `run_pre_down_hook()` method, move the fetch block earlier in `setup()`, insert the in-memory augmentation.
-3. Modify `download_repos.py`: pass `pre_down_hook` from config entry into the manager constructor.
-4. Update `config/repos-config.json` (and `.full`, `.test`): add `"pre_down_hook": true` to the gstack entry only.
-5. Add the 6 unit tests + integration test to `test_dir_download.py`. Add 1 test to `test_download_repos.py`.
-6. Run `pytest raw-harness-repo/tests/ -m "not integration"` and confirm unit tests pass.
-7. Run the integration test against the test config (`repos-config.json.test`) to confirm gstack skill folders are materialized.
-8. Run `black`, `isort`, `ruff` on modified files (per project `python/coding-style.md`).
-9. Update the issue close-out referencing the new module.
+1. Add the 6 unit tests to `test_dir_download.py` (RED — they should fail because `run_pre_down_hook` doesn't exist yet) and 1 pass-through test to `test_download_repos.py`.
+2. Create `skill_folders.py` with the strategy and dispatcher (URL is a parameter, not a constant). Run the new unit tests — they should pass for the strategy module (GREEN).
+3. Modify `dir-download.py`: add import, add `pre_down_hook` param to `__init__`, add `run_pre_down_hook()` method, move the fetch block earlier in `setup()`, insert the in-memory augmentation. Run all unit tests (GREEN).
+4. Modify `download_repos.py`: pass `pre_down_hook` from config entry into the manager constructor. Run all unit tests (GREEN).
+5. Update `config/repos-config.json` (and `.full`, `.test`): add `"pre_down_hook": true` to the gstack entry only.
+6. Add the integration test to `test_dir_download.py` (gated by `@pytest.mark.integration`).
+7. Run `pytest raw-harness-repo/tests/ -m "not integration"` and confirm unit tests pass.
+8. Run the integration test against the test config (`repos-config.json.test`) to confirm gstack skill folders are materialized.
+9. Run `black`, `isort`, `ruff` on modified files (per project `python/coding-style.md`).
+10. Refactor (IMPROVE) — if the new code has duplication, magic strings, or unclear names, clean them up. Re-run unit tests.
+11. Update the issue close-out referencing the new module.
 
 ## Verification
 
