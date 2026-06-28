@@ -32,6 +32,10 @@
     {
       "url": "https://github.com/EveryInc/compound-engineering-plugin.git",
       "skill_folders": ["/docs/skills/", "/skills/"]
+    },
+    {
+      "url": "https://github.com/addyosmani/agent-skills.git",
+      "skill_folders": ["/agents/", "/commands/", "/skills/"]
     }
   ],
   "settings": {
