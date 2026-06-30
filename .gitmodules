@@ -1,0 +1,4 @@
+[submodule "raw-harness-repo/repos"]
+	path = raw-harness-repo/repos
+	url = git@github.com:livelybug/harness-repo-skill-collection.git
+	branch = main
